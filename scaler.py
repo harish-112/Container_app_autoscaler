@@ -1,13 +1,5 @@
 from datetime import datetime
-
-from config import (
-    CPU_SCALE_OUT,
-    CPU_SCALE_IN,
-    MAX_REPLICAS,
-    MIN_REPLICAS,
-    COOLDOWN,
-    SCALE_CONFIRMATION_COUNT
-)
+from config import *
 
 class AutoScaler:
 
@@ -24,45 +16,52 @@ class AutoScaler:
         return elapsed < COOLDOWN
 
     def should_scale(self, metrics):
-        cpu = metrics["CpuPercentage"]
-        replicas = int(metrics["Replicas"])
+        cpu = metrics["cpu"]
+        replicas = int(metrics["replicas"])
 
         if self.in_cooldown():
+            print("Cooldown active.")
             return None
 
-        if cpu > CPU_SCALE_OUT:
+        if cpu > TARGET_CPU:
             self.high_cpu_count += 1
             self.low_cpu_count = 0
 
-        elif cpu < CPU_SCALE_IN:
-            self.low_cpu_count += 1
-            self.high_cpu_count = 0
+            if (self.high_cpu_count >= SCALE_CONFIRMATION_COUNT
+                and replicas < MAX_REPLICAS):
 
+                self.high_cpu_count = 0
+                self.last_scaled_time = datetime.now()
+
+                return {
+                    "action": "scale_out",
+                    "target_replicas": replicas + 1
+                }
+    
         else:
-            self.high_cpu_count = 0
-            self.low_cpu_count = 0
-            return None
 
-        if (self.high_cpu_count >= SCALE_CONFIRMATION_COUNT
-            and replicas < MAX_REPLICAS):
+            optimal_replicas = replicas
+            for candidate in range(MIN_REPLICAS, replicas):
+                expected_cpu = cpu * replicas / candidate
+                if expected_cpu <= TARGET_CPU:
+                    optimal_replicas = candidate
+                    break
 
-            self.high_cpu_count = 0
-            self.last_scaled_time = datetime.now()
+            if optimal_replicas < replicas:
+                self.low_cpu_count += 1
+                self.high_cpu_count = 0
 
-            return {
-                "action": "scale_out",
-                "target_replicas": replicas + 1
-            }
+                if self.low_cpu_count >= SCALE_CONFIRMATION_COUNT:
+                    self.low_cpu_count = 0
+                    self.last_scaled_time = datetime.now()
 
-        if (self.low_cpu_count >= SCALE_CONFIRMATION_COUNT
-            and replicas > MIN_REPLICAS):
-            
-            self.low_cpu_count = 0
-            self.last_scaled_time = datetime.now()
+                    return {
+                        "action": "scale_in",
+                        "target_replicas": optimal_replicas
+                    }
 
-            return {
-                "action": "scale_in",
-                "target_replicas": replicas - 1
-            }
+            else:
+                self.low_cpu_count = 0
+                self.high_cpu_count = 0
 
         return None
