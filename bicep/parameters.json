@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "containerAppName": {
+      "value": "container-apps-autoscaler"
+    },
+    "environmentId": {
+      "value": "/subscriptions/875deced-5098-4b24-bfc4-a23ac706b983/resourceGroups/kyro-autoscaler-rg/providers/Microsoft.App/managedEnvironments/kyro-autoscaler-env"
+    },
+    "imageName": {
+      "value": "constructionacr2026.azurecr.io/aca-autoscaler:latest"
+    },
+    "cpu": {
+      "value": "0.5"
+    },
+    "memory": {
+      "value": "1.0Gi"
+    },
+    "minReplicas": {
+      "value": 1
+    },
+    "maxReplicas": {
+      "value": 5
+    },
+    "acrServer": {
+      "value": "constructionacr2026.azurecr.io"
+    },
+    "acrResourceId": {
+      "value": "/subscriptions/875deced-5098-4b24-bfc4-a23ac706b983/resourceGroups/construction-rg/providers/Microsoft.ContainerRegistry/registries/constructionacr2026"
+    }
+  }
+}
