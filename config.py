@@ -21,3 +21,4 @@ COOLDOWN=60
 SCALE_CONFIRMATION_COUNT=2
 BICEP_FILE = "bicep\deploy.bicep"
 
+
