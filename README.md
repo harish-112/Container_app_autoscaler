@@ -7,16 +7,20 @@
 Before I dive into the architectural details and the code breakdown of this project, I want to show exactly how the system behaves under real-world conditions. Below, you can see the live execution output of the autoscaling engine actively monitoring metrics, evaluating thresholds, handling cooldown parameters, and triggering scaling operations in real time.
 <table border="0">
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/b8bd0c42-75d2-43f7-8f08-9cc6367a92bd" alt="Demo Part 1" width="100%"></td>
-    <td><img src="https://github.com/user-attachments/assets/dfacdb71-f1e2-44bd-a3c7-ea4e5e1be222" alt="Demo Part 2" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/b8bd0c42-75d2-43f7-8f08-9cc6367a92bd" alt="1" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/dfacdb71-f1e2-44bd-a3c7-ea4e5e1be222" alt="2" width="100%"></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/3a1f9cbc-c374-430f-859b-09fb7252e9d0" alt="Demo Part 3" width="100%"></td>
-    <td><img src="https://github.com/user-attachments/assets/e28d7b27-9695-4649-8363-0e98c0c2d763" alt="Demo Part 4" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/3a1f9cbc-c374-430f-859b-09fb7252e9d0" alt="3" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/e28d7b27-9695-4649-8363-0e98c0c2d763" alt="4" width="100%"></td>
   </tr>
 </table>
 
+During testing, the application initially runs with a single replica. The autoscaler continuously monitors CPU utilization at fixed polling intervals. A single high CPU reading does not immediately trigger scaling because temporary spikes may not represent sustained workload. Instead, the CPU utilization must remain above the configured target (75%) for two consecutive polling cycles before a scale-out operation is performed.
 
+After a new replica is deployed, the autoscaler enters a 60-second cooldown period. This allows the newly created replica to become healthy, traffic to be redistributed, and Azure Monitor to report updated metrics. Once the cooldown expires, monitoring resumes. If CPU utilization remains above the target for another two consecutive polling cycles, an additional replica is created.
+
+Similarly, when CPU utilization remains below the target for consecutive polling cycles, the autoscaler evaluates whether the workload can be handled by fewer replicas. Rather than removing one replica at a time, it estimates the expected CPU utilization for every possible lower replica count and directly selects the minimum safe replica count that keeps CPU utilization below the configured target. This approach minimizes deployment operations while optimizing infrastructure cost.
 
 ---
 
@@ -92,27 +96,38 @@ Building a custom autoscaling engine instead of relying on default cloud rules g
 
 ## 5. Architecture
 
+### 6.5.4 System Workflow Architecture
+
+The sequential automation loop for the orchestration engine is outlined in the diagram below:
+
 ```text
-Azure Container App
-        │
-        ▼
-Azure Monitor
-        │
-        ▼
-monitor.py
-        │
-        ▼
-scaler.py
-        │
-        ▼
-azure_scale.py
-        │
-        ▼
-deploy.bicep
-        │
-        ▼
-Azure Container App
+                 Start Autoscaler
+                        │
+                        ▼
+              Collect Azure Metrics
+                        │
+                        ▼
+         Retrieve Current Replica Count
+                        │
+                        ▼
+            Evaluate Scaling Decision
+                        │
+         ┌──────────────┴──────────────┐
+         │                             │
+         ▼                             ▼
+  No Scaling Required          Scaling Required
+         │                             │
+         │                             ▼
+         │                 Deploy Updated Bicep
+         │                             │
+         └──────────────┬──────────────┘
+                        ▼
+             Wait Monitoring Interval
+                        │
+                        ▼
+                  Repeat Process
 ```
+
 The autoscaler continuously monitors the Azure Container App, evaluates the collected metrics, decides whether scaling is required, and updates the application by redeploying the Bicep template with the new replica configuration.
 
 ---
