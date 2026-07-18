@@ -1,3 +1,4 @@
+#since its for assignment purpose, parameters.json file is pushed, in production this should not be exposed.
 {
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
