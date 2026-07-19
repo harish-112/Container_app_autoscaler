@@ -1,5 +1,7 @@
-#since its for assignment purpose, parameters.json file is pushed, in production this should not be exposed.
+
 {
+  "__comment": "Do not expose this file publicly. It contains environment-specific deployment IDs.For assignment evaluation purpose ,i have exposed them here.",
+  
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
@@ -10,7 +12,7 @@
       "value": "/subscriptions/875deced-5098-4b24-bfc4-a23ac706b983/resourceGroups/kyro-autoscaler-rg/providers/Microsoft.App/managedEnvironments/kyro-autoscaler-env"
     },
     "imageName": {
-      "value": "constructionacr2026.azurecr.io/aca-autoscaler:latest"
+      "value": "constructionacr2026.azurecr.io/aca-autoscaler:v1"
     },
     "cpu": {
       "value": "0.5"
