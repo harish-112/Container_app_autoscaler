@@ -1,6 +1,5 @@
 import json
 import subprocess
-
 from config import RESOURCE_ID
 
 METRIC_MAP = {
@@ -10,6 +9,7 @@ METRIC_MAP = {
 }
 
 def get_metrics():
+    
     command = [
         r"C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd",
         "monitor",
@@ -17,7 +17,7 @@ def get_metrics():
         "list",
         "--resource",RESOURCE_ID,
         "--metric",",".join(METRIC_MAP.keys()),
-        "--interval","PT5M",
+        "--interval","PT1M",
         "--aggregation","Average",
         "--output","json"
     ]
@@ -35,7 +35,6 @@ def get_metrics():
     metrics = {}
 
     for metric in response["value"]:
-
         name = metric["name"]["value"]
         value = None
         series = metric.get("timeseries", [])

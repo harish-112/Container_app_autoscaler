@@ -14,7 +14,7 @@ param acrResourceId string
 var acrName = last(split(acrResourceId, '/'))
 var acrResourceGroup = split(acrResourceId, '/')[4] // extracted 'construction-rg' name from the long resourceId string
 
-// 1. Created the User-Assigned Identity
+// 1. Created the User-Assigned Identity to be used by the Container App to pull images from ACR
 resource userIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${containerAppName}-identity'
   location: resourceGroup().location
