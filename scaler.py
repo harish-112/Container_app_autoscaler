@@ -1,7 +1,20 @@
 from datetime import datetime
-from config import *
+from config import (
+    TARGET_CPU,
+    MAX_REPLICAS,
+    MIN_REPLICAS,
+    COOLDOWN,
+    SCALE_CONFIRMATION_COUNT
+)
 
 class AutoScaler:
+    """I designed this class to serve as the core decision-making layer of my custom autoscaler. 
+    Instead of relying on standard out-of-the-box logic, I built this to continuously evaluate 
+    real-time metrics against my target CPU thresholds. 
+    
+    To ensure the system is both reliable and cost-efficient, I implemented a scale confirmation 
+    counter mechanism to prevent premature scaling during temporary spikes, alongside a strict 
+    cooldown timer to stop infrastructure 'flapping' or rapid, unnecessary scaling cycles."""
 
     def __init__(self):
         self.last_scaled_time = None
