@@ -33,7 +33,12 @@ This curiosity is what sparked my deep interest in DevOps. However, as I dug dee
 Driven by this mindset, I was excited to tackle this exact challenge given as assignment  at Kyro. 
 
 Modern cloud applications face constantly shifting workloads, and running a fixed number of container instances either leads to wasted infrastructure costs during low traffic or poor performance during peak hours. 
-To solve this, I designed and implemented a custom autoscaling solution for Azure Container Apps. 
+To solve this, I designed and implemented a custom autoscaling solution for Azure Container Apps.
+
+This implementation demonstrates a custom autoscaling controller to understand the end-to-end scaling workflow.
+
+In a production Azure Container Apps environment, **the preferred approach would be to configure KEDA scale rules (CPU, HTTP, queue-based, etc.)** declaratively using Bicep and allow Azure Container Apps to manage replica scaling natively.
+The custom autoscaler implemented in this project is **intended as an educational implementation of the scaling decision process** rather than a replacement for Azure's native autoscaling capabilities.
 
 By continuously monitoring application metrics and evaluating real-time workload conditions, my system automatically adjusts the number of running container replicas using parameterized Bicep templates, successfully balancing high performance with strict cost efficiency.
 
@@ -197,14 +202,14 @@ This approach keeps the infrastructure reproducible and allows replica configura
 ### Components
 
 
-### monitor.py
+### monitor_cli.py
 
 **Responsibility**
 Collects application telemetry and performance metrics from Azure Monitor.
 
 **Inputs**
 * Azure Resource ID
-* Target Metric Names (`CpuPercentage`, `MemoryWorkingSetPercentage`, etc.)
+* Target Metric Names (`cpu`, `memory`, etc.)
 
 **Outputs**
 * CPU Utilization
@@ -235,11 +240,20 @@ The scaler implements several mechanisms to ensure stable scaling decisions:
 * 
   $$\text{Expected CPU} = \frac{\text{Current CPU} \times \text{Current Replicas}}{\text{Candidate Replicas}}$$
 
+
   The first replica count whose expected CPU remains below the target threshold is selected. This allows the autoscaler to directly scale to the **minimum safe replica count**, reducing unnecessary intermediate deployments and lowering infrastructure costs. Compared to reducing one replica at a time, this approach reaches the optimal state faster while minimizing deployment operations.
 * **Cooldown:** After every scaling operation, the autoscaler waits for a configurable cooldown period before making another scaling decision. This gives the application enough time to stabilize and allows Azure Monitor to report updated metrics. Without a cooldown period, the autoscaler might react to stale metrics and perform unnecessary scaling actions.
 * **Confirmation Count:** A single CPU spike should not immediately trigger scaling. To prevent this, scaling decisions are made only after the CPU threshold is exceeded (or remains below the threshold) for a configurable number of consecutive monitoring cycles. This reduces false scaling decisions caused by temporary traffic spikes.
 
----
+### Why Scale-to-Zero was not implemented
+
+Azure Container Apps support **scale-to-zero** through KEDA, where the application is activated by an event such as an HTTP request, queue message, or other supported triggers.
+
+In this project, I implemented a **CPU-based custom autoscaler**. Since CPU metrics are available only when at least one container instance is running, scaling down to zero would leave no running instance to generate utilization metrics. As a result, the autoscaler would have no information to determine when the application should scale back up.
+
+To ensure continuous monitoring and autonomous scaling decisions, I configured the minimum replica count as **1**. In a production implementation, scale-to-zero would typically be achieved using KEDA's event-driven scaling rules rather than a polling-based CPU autoscaler.
+
+ ---
 
 #### Preventing Flapping (Oscillation)
 
