@@ -18,7 +18,7 @@ def update_replicas(target_replicas):
     """
 
     command = [
-    r"C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd",
+    "az",
     "deployment", "group", "create",
     "--resource-group", RESOURCE_GROUP,
     "--template-file", BICEP_FILE,

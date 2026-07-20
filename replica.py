@@ -9,7 +9,7 @@ from config import (
 def get_current_replicas():
 
     command = [
-        r"C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd",
+        "az",
         "containerapp",
         "show",
         "--resource-group",RESOURCE_GROUP,

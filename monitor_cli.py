@@ -11,7 +11,7 @@ METRIC_MAP = {
 def get_metrics():
     
     command = [
-        r"C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd",
+        "az",
         "monitor",
         "metrics",
         "list",
