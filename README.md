@@ -8,11 +8,11 @@ Before I dive into the architectural details and the code breakdown of this proj
 <table border="0">
   <tr>
     <td><img src="https://github.com/user-attachments/assets/b8bd0c42-75d2-43f7-8f08-9cc6367a92bd" alt="1" width="100%"></td>
-    <td><img src="https://github.com/user-attachments/assets/dfacdb71-f1e2-44bd-a3c7-ea4e5e1be222" alt="2" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/6d903432-cd96-4bb7-8c26-4fd4ff7e97e4" alt="2" width="100%"></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/3a1f9cbc-c374-430f-859b-09fb7252e9d0" alt="3" width="100%"></td>
-    <td><img src="https://github.com/user-attachments/assets/e28d7b27-9695-4649-8363-0e98c0c2d763" alt="4" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/0c92bcb7-e7a7-40d8-b64f-00d518f206d7" alt="3" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/b6e8a6ea-795b-4b66-809e-73a50ae0374c" alt="4" width="100%"></td>
   </tr>
 </table>
 
@@ -21,6 +21,22 @@ During testing, the application initially runs with a single replica. The autosc
 After a new replica is deployed, the autoscaler enters a 60-second cooldown period. This allows the newly created replica to become healthy, traffic to be redistributed, and Azure Monitor to report updated metrics. Once the cooldown expires, monitoring resumes. If CPU utilization remains above the target for another two consecutive polling cycles, an additional replica is created.
 
 Similarly, when CPU utilization remains below the target for consecutive polling cycles, the autoscaler evaluates whether the workload can be handled by fewer replicas. Rather than removing one replica at a time, it estimates the expected CPU utilization for every possible lower replica count and directly selects the minimum safe replica count that keeps CPU utilization below the configured target. This approach minimizes deployment operations while optimizing infrastructure cost.
+
+#### Autoscaling Validation
+
+The screenshot below demonstrates the complete autoscaling workflow.
+
+<img width="1069" height="270" alt="image" src="https://github.com/user-attachments/assets/685cb772-b9f3-4979-a8cf-484d4b186b83" />
+
+Initially, the application runs with a single replica and remains idle, resulting in no scaling actions. **After generating CPU-intensive traffic through the `/stress` endpoint, CPU utilization reaches 100%.**
+
+Rather than reacting immediately, the autoscaler waits for the configured **confirmation count to ensure that the workload is sustained and not caused by a temporary spike.** Once the threshold is exceeded for consecutive monitoring cycles, the autoscaler updates the deployment and increases the replica count from **1** to **2**.
+
+Following a successful deployment, the autoscaler enters a cooldown period. During this period, **monitoring continues at every polling interval, but additional scaling actions are temporarily blocked.** This allows the new replica to become healthy, application traffic to redistribute, and Azure Monitor metrics to stabilize before further scaling decisions are evaluated.
+
+The Azure Portal confirms that the deployment has been updated successfully with the new replica configuration.
+
+The cooldown shown in the Azure Portal belongs to Azure Container Apps' native scaling configuration. This project uses a custom Python-based autoscaler, where the effective cooldown period is configured within the application logic (COOLDOWN = 60 seconds). Since the **native autoscaler is intentionally constrained by setting minReplicas and maxReplicas to the same value**, the Python autoscaler remains the sole controller of scaling decisions.
 
 ---
 
@@ -201,10 +217,8 @@ This approach keeps the infrastructure reproducible and allows replica configura
 
 ### Components
 
-
 ### monitor_cli.py
 
-**Responsibility**
 Collects application telemetry and performance metrics from Azure Monitor.
 
 **Inputs**
@@ -216,6 +230,11 @@ Collects application telemetry and performance metrics from Azure Monitor.
 * Memory Utilization
 * Request Count
 
+#### Metrics Used
+This implementation primarily uses **CPU utilization** as the scaling metric because it directly reflects the computational load on the application and provides a simple, effective basis for demonstrating the autoscaling logic.
+
+In a production environment, scaling decisions are typically made using a combination of metrics such as **CPU utilization, memory usage, request rate, queue length, or custom application metrics**. Combining multiple metrics enables more accurate and workload-aware scaling decisions while reducing the likelihood of under- or over-provisioning.
+  
 **Azure CLI Command Used**
 ```
 az monitor metrics list
@@ -225,7 +244,6 @@ az monitor metrics list
 For this project, I prioritized **Azure CLI** over the Azure SDK to minimize configuration overhead and focus purely on the autoscaling logic.
 
 * **Zero Dependency Overhead:** Avoids heavy Python SDK library management and versioning.
-* **Unified Authentication:** Reuses active system-level CLI sessions (`az login`) automatically.
 * **Rapid Debugging:** Commands can be tested directly in the terminal before script integration.
 * **Objective-Focused:** Provides a straightforward, lightweight shortcut for metric extraction without enterprise pipeline complexity.
 
@@ -245,7 +263,7 @@ The scaler implements several mechanisms to ensure stable scaling decisions:
 * **Cooldown:** After every scaling operation, the autoscaler waits for a configurable cooldown period before making another scaling decision. This gives the application enough time to stabilize and allows Azure Monitor to report updated metrics. Without a cooldown period, the autoscaler might react to stale metrics and perform unnecessary scaling actions.
 * **Confirmation Count:** A single CPU spike should not immediately trigger scaling. To prevent this, scaling decisions are made only after the CPU threshold is exceeded (or remains below the threshold) for a configurable number of consecutive monitoring cycles. This reduces false scaling decisions caused by temporary traffic spikes.
 
-### Why Scale-to-Zero was not implemented
+#### Why Scale-to-Zero was not implemented
 
 Azure Container Apps support **scale-to-zero** through KEDA, where the application is activated by an event such as an HTTP request, queue message, or other supported triggers.
 
@@ -301,6 +319,10 @@ az deployment group create \
 
 By reusing the same Infrastructure as Code template, the application configuration remains consistent and version-controlled. The autoscaler only changes the replica configuration while the remaining infrastructure stays unchanged.
 
+While **using `az containerapp update` would be the standard way** to quickly bump up the replica count, 
+the **project explicitly demands infrastructure automation using Bicep.** To keep everything strictly 
+aligned with the IaC framework, I chose to use `az deployment group create` instead.
+
 ### main.py
 
 The main.py file acts as the orchestrator of the autoscaling system.
@@ -347,4 +369,6 @@ To make the system highly available and production-ready, I want to implement th
 
 ## 8. Conclusion
 
-This project demonstrates a custom autoscaling solution for Azure Container Apps using Azure Monitor, Python, Azure CLI and Bicep. The implementation balances application performance, stability and infrastructure cost through a modular and maintainable design.
+Finally, I have come to the end after mapping out this entire architecture from top to bottom. Building this project was an excellent learning experience, demonstrating how to engineer a custom, end-to-end autoscaling engine for Azure Container Apps using Azure Monitor, Python, the Azure CLI, and Bicep templates.
+
+Rather than simply configuring the platform's built-in autoscaling, I implemented the scaling decision logic from scratch to understand the complete workflow—from metric collection and decision making to infrastructure deployment. While Azure Container Apps provide native autoscaling through KEDA for production environments, this project focuses on building the underlying autoscaling mechanism as required by the assignment, with features such as confirmation counts, cooldown periods, and predictive scale-in to ensure stable and cost-aware scaling decisions.
